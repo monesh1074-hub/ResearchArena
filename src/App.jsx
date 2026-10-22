@@ -1,19 +1,17 @@
-'use client';
-
 import React, { useState, useEffect, useRef } from 'react';
-import Header from '../components/Header';
-import ChallengeOverview from '../components/ChallengeOverview';
-import OverviewCards from '../components/OverviewCards';
-import WorkloadControls from '../components/WorkloadControls';
-import LiveCharts from '../components/LiveCharts';
-import ComparisonSection from '../components/ComparisonSection';
-import TransactionLogs from '../components/TransactionLogs';
-import StrategyEventsFeed from '../components/StrategyEventsFeed';
-import AdaptiveConfigModal from '../components/AdaptiveConfigModal';
-import SubmitAbstractModal from '../components/SubmitAbstractModal';
-import { api } from '../services/api';
+import Header from './components/Header';
+import ChallengeOverview from './components/ChallengeOverview';
+import OverviewCards from './components/OverviewCards';
+import WorkloadControls from './components/WorkloadControls';
+import LiveCharts from './components/LiveCharts';
+import ComparisonSection from './components/ComparisonSection';
+import TransactionLogs from './components/TransactionLogs';
+import StrategyEventsFeed from './components/StrategyEventsFeed';
+import AdaptiveConfigModal from './components/AdaptiveConfigModal';
+import SubmitAbstractModal from './components/SubmitAbstractModal';
+import { api } from './services/api';
 
-export default function Home() {
+export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('arena'); // 'arena' | 'challenge' | 'ledger'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);

@@ -2,18 +2,21 @@
   "name": "research-arena",
   "version": "1.0.0",
   "private": true,
-  "description": "Contention-Aware Transaction Guard (CTG) - Research Arena Platform",
+  "description": "Research Arena - Contention-Aware Transaction Guard (CTG) - React Platform",
+
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server.cjs",
     "deploy": "npx -y vercel --prod"
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "lucide-react": "^0.475.0",
-    "next": "^14.2.24",
     "pg": "^8.13.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -21,8 +24,12 @@
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.2",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.1.0"
   }
 }
