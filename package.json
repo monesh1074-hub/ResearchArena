@@ -1,0 +1,12 @@
+{
+  "name": "research-arena",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Research Arena - Contention-Aware Transaction Guard (CTG)",
+  "scripts": {
+    "build": "npm --prefix contention-guard/client run build",
+    "client": "npm --prefix contention-guard/client run dev",
+    "server": "npm --prefix contention-guard/server start",
+    "dev": "npm --prefix contention-guard run dev"
+  }
+}
