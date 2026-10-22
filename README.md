@@ -1,40 +1,42 @@
-# ContentionGuard | Adaptive Transaction Intelligence
-> **A Research Platform and Benchmark Suite Evaluating Optimistic Concurrency Control (OCC), Pessimistic Concurrency Control (PCC), and Contention-Aware Adaptive Guard for Web API Transactions.**
+# Research Arena | Contention-Aware Transaction Guard (CTG)
+> **A High-Performance Research Benchmark Platform Evaluating Optimistic Concurrency Control (OCC), Pessimistic Concurrency Control (PCC), and Dynamic Contention-Aware Adaptive Guarding for Web API Transactions.**
 
-[![Node.js](https://img.shields.io/badge/Node.js-v20+-green.svg)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-purple.svg)](https://vitejs.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-v20+-green.svg)](https://nodejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
+[![Vercel](https://img.shields.io/badge/Vercel-Deployable-black.svg)](https://vercel.com/)
 [![License](https://img.shields.io/badge/License-MIT-brightgreen.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-10%2F10%20Passed%20(100%25)-success.svg)](#6-automated-tests)
 
 ---
 
-## 1. Research Objective
+## 1. Research Overview
 
-In high-volume e-commerce, ticketing, and fintech web APIs, concurrent purchase requests frequently compete for limited resources (e.g., inventory flash sales). Standard static concurrency protocols suffer from severe trade-offs:
-- **Optimistic Concurrency Control (OCC)** achieves ultra-high throughput under low contention by avoiding locks, but collapses under high contention due to repeated validation failures, retry thrashing, and high transaction abort rates.
-- **Pessimistic Concurrency Control (PCC)** serializes updates via row-level locks (`SELECT ... FOR UPDATE`), eliminating retry thrashing and ensuring zero conflicts, but introduces lock queuing latency and lower throughput during low-contention periods.
+In high-concurrency web applications (e.g., e-commerce flash sales, ticketing platforms, financial order books), simultaneous write transactions compete for shared resources. Standard static concurrency protocols suffer from severe fundamental trade-offs:
 
-### Core Research Question
-> *"Can a contention-aware adaptive concurrency control mechanism improve transaction throughput and response time while maintaining strict data consistency under changing workloads?"*
+* **Optimistic Concurrency Control (OCC)**: Validates versions at commit time (`WHERE id = $1 AND version = $2`). Outstandingly fast with zero locking overhead under low contention, but collapses under high contention due to cascading version collisions, exponential backoff retries, and high abort rates.
+* **Pessimistic Concurrency Control (PCC)**: Serializes write access through row-level exclusive locks (`SELECT ... FOR UPDATE`). Eliminates conflict aborts and protects hot inventory, but introduces substantial lock queuing latency and lower throughput during low-contention periods.
 
-**ContentionGuard** implements and benchmarks an intelligent controller—the **Contention-Aware Adaptive Guard**—which monitors real-time transaction telemetry over a sliding window, computes a normalized contention score, and dynamically shifts between OCC and PCC using dual-threshold hysteresis and cooldown mechanics.
+### The Research Question
+> *"Can a contention-aware adaptive concurrency control mechanism dynamically balance transaction throughput, conflict rates, and tail latency while strictly preserving data consistency under volatile workloads?"*
+
+**Research Arena** implements the **Contention-Aware Adaptive Guard (CTG)**—an intelligent routing engine that continuously monitors telemetry across a sliding observation window, calculates a normalized contention score, and dynamically switches between OCC and PCC using dual-threshold hysteresis and cooldown mechanics.
 
 ---
 
-## 2. Architecture Diagram
+## 2. System Architecture
 
 ```
 +-----------------------------------------------------------------------------------+
-|               ContentionGuard Web Dashboard (React + Vite + Tailwind + Recharts)  |
+|               Research Arena Web Dashboard (React 18 + Vite + Recharts)           |
 |  - Real-time KPIs (TPS, Latency, Conflicts)  - Workload Profile Generator         |
 |  - Live Hysteresis Contention Gauge          - Interactive Comparison & CSV Export|
+|  - Anti-Fluctuation State Guard              - Continuous Telemetry Engine        |
 +------------------------------------------+----------------------------------------+
-                                           | HTTP REST API (port 4000)
+                                           | Integrated Middleware (Vite: 5173 / Vercel: /api)
                                            v
 +-----------------------------------------------------------------------------------+
-|                        Express.js Application & REST Router                       |
+|                        Express.js Backend API & Simulator                         |
 |   /api/health       /api/products       /api/transactions/purchase                |
 |   /api/simulation/* /api/metrics        /api/strategy/*    /api/consistency/report|
 +------------------------------------------+----------------------------------------+
@@ -58,265 +60,121 @@ In high-volume e-commerce, ticketing, and fintech web APIs, concurrent purchase 
                       v                               v
 +-----------------------------------+   +-------------------------------------------+
 | Optimistic Concurrency (OCC)      |   | Pessimistic Concurrency (PCC)             |
-| - Version-conditional update      |   | - PostgreSQL SELECT ... FOR UPDATE        |
-| - WHERE id=$1 AND version=$2      |   | - Mutex row locking & queue wait metrics  |
-| - Jittered exponential backoff    |   | - Atomic commit / safe rollback           |
-+-----------------+-----------------+   +---------------------+---------------------+
-                  \                                   /
-                   \                                 /
-                    v                               v
+| Atomic Version Compare-and-Swap   |   | Exclusive Row-Level Lock                  |
+| Exponential Jittered Backoff Loop |   | (SELECT ... FOR UPDATE)                   |
++-----------------------------------+   +-------------------------------------------+
+                      |                               |
+                      +---------------+---------------+
+                                      |
+                                      v
 +-----------------------------------------------------------------------------------+
-|                       Database Storage Engine Abstraction Layer                   |
-|                                                                                   |
-|  [Mode A: PostgreSQL 16 (Real DB)]          [Mode B: In-Memory Transaction Engine]|
-|  - Connection pooling via `pg.Pool`         - Mutex row lock queues with timeouts |
-|  - Full MVCC & ACID transactions            - Versioned CAS & Rollback primitives |
-|  - CHECK (stock >= 0) constraint            - Atomic stock integrity validation   |
-|                                                                                   |
-|  * Seamless auto-fallback: if PostgreSQL is offline, In-Memory Engine activates   |
-|    automatically and is clearly labeled in the UI badge.                          |
+|               Dual-Engine Storage Layer (In-Memory Engine & PostgreSQL)           |
+|   - Strict Invariant Verification Matrix (Zero Negative Stock, Exact Balances)    |
 +-----------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 3. Concurrency Control Implementations
-
-### A. Optimistic Concurrency Control (OCC) — `server/src/concurrency/occ.js`
-- **Read Phase**: Fetches current product stock and `version`.
-- **Validation & Commit Phase**: Issues conditional update:
-  ```sql
-  UPDATE products 
-  SET stock = stock - $1, version = version + 1, updated_at = CURRENT_TIMESTAMP
-  WHERE id = $2 AND version = $3 AND stock >= $1
-  RETURNING stock, version;
-  ```
-- **Conflict Handling**: If zero rows updated, detects concurrent modification, applies exponential backoff with full random jitter:
-  $$\text{backoff} = \text{random}(0, \min(T_{\max}, T_{\text{base}} \times 2^{\text{attempt}}))$$
-- **Termination**: Bounded to `OCC_MAX_RETRIES` (default 4). If stock is depleted, fast-fails immediately without retrying.
-
-### B. Pessimistic Concurrency Control (PCC) — `server/src/concurrency/pcc.js`
-- **Lock Acquisition**: Checks out database client and begins transaction:
-  ```sql
-  BEGIN;
-  SELECT id, name, stock, version FROM products WHERE id = $1 FOR UPDATE;
-  ```
-- **Lock Wait Tracking**: Measures elapsed time waiting in database lock queue.
-- **Stock Validation & Atomic Write**: Validates `stock >= quantity`, executes decrement, commits transaction with `COMMIT`.
-- **Safe Rollback**: If stock is insufficient or error occurs, rolls back cleanly with `ROLLBACK`.
-
-### C. Contention-Aware Adaptive Guard — `server/src/concurrency/adaptive.js`
-- **Telemetry Window**: Retains last $W = 50$ transactions.
-- **Contention Score Formula**:
-  $$S_{\text{contention}} = 0.45 \times C_{\text{conflict}} + 0.25 \times \min\left(1, \frac{R_{\text{avg}}}{2.0}\right) + 0.15 \times \min\left(1, \frac{L_{\text{avg}} - L_{\text{base}}}{3 \times L_{\text{base}}}\right) + 0.15 \times \min\left(1, \frac{W_{\text{lock}}}{80}\right)$$
-- **Hysteresis Dual Thresholds**:
-  - $S \ge 0.40$ (High Threshold): Escalate to **PCC**.
-  - $S \le 0.15$ (Low Threshold): De-escalate to **OCC**.
-  - $0.15 < S < 0.40$ (Hysteresis Band): Retain current strategy, preventing jitter and oscillation.
-- **Cooldown Filter**: Requires $\ge 10$ transactions or $\ge 2000$ ms before permitting a subsequent strategy flip.
-- **Hot-Resource Override**: Evaluates per-resource contention so hot items can be routed to PCC while cold items run on OCC concurrently.
-
----
-
-## 4. Database Schema
-
-Defined in `server/migrations/init.sql`:
-
-```sql
--- Products Catalog
-CREATE TABLE IF NOT EXISTS products (
-    id VARCHAR(64) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    stock INT NOT NULL CHECK (stock >= 0),
-    version INT NOT NULL DEFAULT 1,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Transaction Audit Ledger
-CREATE TABLE IF NOT EXISTS transactions (
-    id VARCHAR(64) PRIMARY KEY,
-    request_id VARCHAR(128) UNIQUE NOT NULL,
-    product_id VARCHAR(64) NOT NULL REFERENCES products(id),
-    strategy VARCHAR(32) NOT NULL,
-    status VARCHAR(32) NOT NULL,
-    retries INT NOT NULL DEFAULT 0,
-    conflict_detected BOOLEAN NOT NULL DEFAULT FALSE,
-    execution_time_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Strategy Transition Event History
-CREATE TABLE IF NOT EXISTS strategy_events (
-    id SERIAL PRIMARY KEY,
-    previous_strategy VARCHAR(32) NOT NULL,
-    new_strategy VARCHAR(32) NOT NULL,
-    contention_score DOUBLE PRECISION NOT NULL,
-    reason TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Idempotency Ledger
-CREATE TABLE IF NOT EXISTS idempotency_keys (
-    request_id VARCHAR(128) PRIMARY KEY,
-    status VARCHAR(32) NOT NULL,
-    response_body JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-```
-
----
-
-## 5. Setup & Execution Commands
+## 3. Quick Start
 
 ### Prerequisites
-- Node.js v18+ (v20+ recommended)
-- Optional: PostgreSQL (if unavailable, in-memory mode runs automatically with zero configuration)
+* **Node.js**: v18.0 or newer
+* **npm**: v9.0 or newer
 
-### Quick Start (Single Command)
-From the `contention-guard` root directory:
+### Installation & Run
 
-```bash
-# 1. Install root, server, and client dependencies
-npm install
-cd server && npm install && cd ..
-cd client && npm install && cd ..
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/monesh1074-hub/ResearchArena.git
+   cd ResearchArena
+   ```
 
-# 2. Run both Backend API (port 4000) and Frontend Dashboard (port 5173) concurrently
-npm run dev
-```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-The application will be available at:
-- **Dashboard UI**: [http://localhost:5173](http://localhost:5173)
-- **API Server**: [http://localhost:4000](http://localhost:4000)
-- **Healthcheck**: [http://localhost:4000/api/health](http://localhost:4000/api/health)
+3. **Launch the application with a single command:**
+   ```bash
+   npm run dev
+   ```
 
-### Running Separately
-```bash
-# Terminal 1: Start Backend API
-cd server
-npm start
-
-# Terminal 2: Start Vite Client
-cd client
-npm run dev
-```
+4. **Open your browser:**
+   ```
+   http://localhost:5173
+   ```
+   Both the React frontend dashboard and all `/api/*` backend endpoints execute simultaneously from this single command.
 
 ---
 
-## 6. Automated Tests
+## 4. Single-Command Scripts
 
-Run the test suite verifying all 10 transaction correctness and concurrency conditions:
-
-```bash
-cd server
-npm test
-```
-
-### Test Verification Matrix
-| Test Case | Condition Tested | Verification Method | Result |
-|-----------|------------------|---------------------|--------|
-| **1. OCC Conflict Detection** | Atomic version mismatch detection | Concurrent conditional updates with identical versions | **PASSED** |
-| **2. PCC Serialization** | Row-level locking (`FOR UPDATE`) | 10 concurrent requests to single row serialized safely | **PASSED** |
-| **3. Adaptive Escalation** | Strategy escalation under contention | Sustained validation aborts trigger OCC $\rightarrow$ PCC | **PASSED** |
-| **4. Hysteresis Stability** | Anti-chattering band | Mid-range score (30%) remains stable, no flip-flopping | **PASSED** |
-| **5. Bounded Retries** | Infinite loop prevention | Max retries (3) enforced with jittered backoff | **PASSED** |
-| **6. High Contention Oversell Guard** | Requests (25) exceed stock (5) | Exactly 5 succeed, 20 rejected, stock = 0 (never negative) | **PASSED** |
-| **7. Insufficient Stock Safety** | Request quantity > stock | Clean 409 rejection, zero partial deduction | **PASSED** |
-| **8. Idempotency Key Replay** | Identical request_id replay | Returns cached response, inventory decremented only ONCE | **PASSED** |
-| **9. 3-Way Consistency Check** | All 3 strategies pass invariants | OCC, PCC, and Adaptive pass mathematical consistency audit | **PASSED** |
-| **10. Healthcheck & Metadata** | API contract validity | Health endpoint reports engine mode and catalog items | **PASSED** |
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Starts Vite dev server with integrated Express API middleware on `http://localhost:5173` |
+| `npm run build` | Compiles optimized, chunk-split production bundle into `dist/` |
+| `npm run preview` | Previews the compiled production build locally |
+| `npm start` | Serves compiled React app and API through `server.cjs` on port `4000` |
+| `npm run deploy` | Deploys directly to Vercel via CLI |
 
 ---
 
-## 7. Example API Requests & Responses
+## 5. Deploying to Vercel
 
-### 1. Healthcheck
+The application is pre-configured for **zero-config, zero-error deployment** on Vercel:
+
+### Option 1: Via Vercel Web Dashboard (Recommended)
+1. Go to [vercel.com/new](https://vercel.com/new).
+2. Import your GitHub repository: `monesh1074-hub/ResearchArena`.
+3. Leave all build and framework settings as default (`vercel.json` handles everything).
+4. Click **Deploy**.
+
+### Option 2: Via Terminal
 ```bash
-curl http://localhost:4000/api/health
-```
-```json
-{
-  "status": "HEALTHY",
-  "service": "Contention-Aware Transaction Guard (CTG)",
-  "version": "1.0.0",
-  "database": {
-    "mode": "memory",
-    "isPostgres": false,
-    "isInMemory": true,
-    "label": "In-Memory Simulation Engine"
-  }
-}
+npx vercel --prod
 ```
 
-### 2. Purchase via OCC
-```bash
-curl -X POST http://localhost:4000/api/transactions/purchase \
-  -H "Content-Type: application/json" \
-  -d '{"productId":"prod-1","quantity":1,"strategy":"OCC","requestId":"req-demo-001"}'
-```
-```json
-{
-  "success": true,
-  "status": "SUCCESS",
-  "transactionId": "tx-1729608000-a1b",
-  "requestId": "req-demo-001",
-  "productId": "prod-1",
-  "strategy": "OCC",
-  "retries": 0,
-  "conflictDetected": false,
-  "executionTimeMs": 2.1,
-  "newStock": 99,
-  "newVersion": 2,
-  "message": "Transaction committed successfully under OCC"
-}
-```
+### Why It Works Without Errors on Vercel
+* **SPA URL Rewriting**: Configured in `vercel.json` so refreshing routes never throws a 404 error.
+* **Serverless Backend Routing**: Requests to `/api/(.*)` route directly to the Express serverless handler in `api/index.js`.
+* **Zero-Fluctuation Guarantee**: Includes an **Anti-Fluctuation State Guard** and client-side simulation engine fallback (`src/services/browserEngine.js`) so telemetry and charts never stutter or reset to 0 across Vercel's multi-container edge network.
 
-### 3. Purchase via PCC (Row Lock)
-```bash
-curl -X POST http://localhost:4000/api/transactions/purchase \
-  -H "Content-Type: application/json" \
-  -d '{"productId":"prod-1","quantity":1,"strategy":"PCC","requestId":"req-demo-002"}'
-```
+---
 
-### 4. Purchase via Contention-Aware Adaptive Guard
-```bash
-curl -X POST http://localhost:4000/api/transactions/purchase \
-  -H "Content-Type: application/json" \
-  -d '{"productId":"prod-1","quantity":1,"strategy":"ADAPTIVE","requestId":"req-demo-003"}'
-```
-```json
-{
-  "success": true,
-  "status": "SUCCESS",
-  "productId": "prod-1",
-  "strategy": "ADAPTIVE",
-  "routedStrategy": "PCC",
-  "adaptiveDetails": {
-    "routedStrategy": "PCC",
-    "contentionScore": 0.54,
-    "decisionReason": "Global adaptive state: PCC (Score: 54.0%)"
-  },
-  "newStock": 97
-}
-```
+## 6. Workload Contention Profiles
 
-### 5. Run Automated Comparison Benchmark
-```bash
-curl -X POST http://localhost:4000/api/simulation/compare \
-  -H "Content-Type: application/json" \
-  -d '{"workloadProfile":"high","concurrentClients":15,"totalTransactions":150,"hotResourcePercentage":85,"initialInventory":100}'
-```
+The simulator tests transactional behavior under four distinct workload profiles:
 
-### 6. Export Benchmark CSV
-```bash
-curl http://localhost:4000/api/simulation/export-csv -o ctg_benchmark_results.csv
-```
+1. **Low Contention**:
+   * Requests are distributed uniformly across catalog items (~20% hot-item targeting).
+   * Demonstrates OCC delivering peak non-blocking throughput and sub-millisecond latencies.
+2. **Medium Contention**:
+   * Moderate clustering on hot inventory (~50%).
+   * Version collisions begin to trigger backoff retries.
+3. **High Contention**:
+   * Extreme write contention on a single hot item (~90%).
+   * OCC collapses into retry thrashing; PCC and Adaptive Guard stabilize performance via serialized row-level locks.
+4. **Burst Wave Contention**:
+   * Dynamic time-varying contention wave:
+     * *Phase 1 (0–25%)*: Calm baseline (15% contention) $\rightarrow$ Runs in OCC mode.
+     * *Phase 2 (25–75%)*: Flash sale surge (95% contention) $\rightarrow$ Contention score crosses 40% threshold, triggering automatic shift to PCC.
+     * *Phase 3 (75–100%)*: Contention subsides $\rightarrow$ Contention score drops below 15%, smoothly reverting back to OCC after cooldown.
+
+---
+
+## 7. Comparative Benchmark Summary
+
+| Concurrency Protocol | Low Contention | High Contention | Conflict Behavior | Latency Profile | Best Suited For |
+|---|---|---|---|---|---|
+| **OCC** | **Superior** (Max parallelism, no locks) | **Collapses** (Retry thrashing, aborts) | High version collisions, backoff loops | Low median, high p95/p99 tail latency | Read-heavy or low write contention |
+| **PCC** | **Moderate** (Lock acquire overhead) | **Superior** (Zero conflicts, serialized) | 0% validation conflicts | Consistent median latency, lock queuing | High contention flash sales, hot resources |
+| **Adaptive Guard (CTG)** | **Optimal** (Routes to OCC fast-path) | **Optimal** (Escalates to PCC locks) | Dampened (Transitory during transition) | Lowest balanced p95 latency | Real-world dynamic traffic, burst contention |
 
 ---
 
 ## 8. Invariant Verification & Correctness Guarantees
 
-Every benchmark run is mathematically audited by `server/src/services/consistencyService.js` against five formal invariants:
+Every transaction run is mathematically validated in real time against five formal invariants:
 
 1. **Non-Negative Stock Invariant**:
    $$\forall p \in \text{Products},\quad \text{stock}(p) \ge 0$$
@@ -326,25 +184,95 @@ Every benchmark run is mathematically audited by `server/src/services/consistenc
    $$\sum_{t \in \text{Tx}_{\text{success}}(p)} \text{quantity}(t) \le \text{InitialStock}(p)$$
 4. **Idempotency Uniqueness**:
    $$\forall \text{reqId},\quad |\{t \in \text{Tx}_{\text{success}} \mid \text{request\_id}(t) = \text{reqId}\}| \le 1$$
-5. **No Orphaned or Partial Commits**:
-   Transactions either commit completely or roll back with zero side effects.
+5. **Atomic Commit or Rollback**:
+   Transactions commit completely or abort with zero partial state mutations.
 
 ---
 
-## 9. Research Findings & Empirical Trade-Offs
+## 9. Project Directory Structure
 
-| Concurrency Protocol | Low Contention Performance | High Contention Performance | Conflict Behavior | Latency Profile | Best Suited For |
-|---|---|---|---|---|---|
-| **OCC** | **Superior** (Zero lock overhead, maximum parallelism) | **Degrades** (Retry thrashing, aborts) | High version collisions, backoff loops | Low median, high p95/p99 tail latency | Read-heavy or distributed write workloads |
-| **PCC** | **Moderate** (Lock acquire/release overhead) | **Superior** (Serialized queue, zero aborts) | 0% validation conflicts | Consistent median latency, lock queue wait | High contention flash sales, hot resources |
-| **Adaptive Guard (CTG)** | **Optimal** (Routes to OCC fast-path) | **Optimal** (Escalates to PCC locks) | Dampened (Transitory during switch) | Lowest balanced p95 latency | Real-world dynamic traffic, burst contention |
+```
+Research Arena/
+├── index.html                   # React HTML5 root entry
+├── vite.config.js               # Vite config with integrated Express API middleware
+├── tailwind.config.js           # Tailwind theme & color tokens
+├── postcss.config.js            # PostCSS configuration
+├── package.json                 # Single unified project dependencies & scripts
+├── vercel.json                  # Vercel deployment & rewrite rules
+├── .env.example                 # Environment variables specification
+├── api/
+│   └── index.js                 # Express API handler (Vercel Serverless Function)
+├── src/
+│   ├── main.jsx                 # React root mount
+│   ├── App.jsx                  # Main benchmark dashboard & anti-fluctuation guard
+│   ├── index.css                # Global CSS styles & cards
+│   ├── components/              # Modular UI components
+│   │   ├── Header.jsx           # Status banner & theme toggle
+│   │   ├── OverviewCards.jsx    # Real-time KPI summary cards
+│   │   ├── WorkloadControls.jsx # Simulation parameters & profile selector
+│   │   ├── LiveCharts.jsx       # Recharts live throughput, latency & hysteresis curves
+│   │   ├── ComparisonSection.jsx# 3-way benchmark bar charts & matrix
+│   │   ├── TransactionLogs.jsx  # Real-time transaction audit ledger
+│   │   ├── StrategyEventsFeed.jsx # Transition event history feed
+│   │   ├── AdaptiveConfigModal.jsx# Threshold & cooldown tuning modal
+│   │   └── ChallengeOverview.jsx# Academic problem statement & methodology
+│   ├── lib/                     # Core backend concurrency & simulation engines
+│   │   ├── concurrency/         # OCC, PCC, and Adaptive Guard algorithms
+│   │   ├── database/            # In-Memory Simulation DB & PostgreSQL pool
+│   │   ├── metrics/             # Real-time telemetry & percentile calculator
+│   │   ├── services/            # Transaction inventory & consistency validator
+│   │   └── simulator/           # Multi-worker asynchronous workload simulator
+│   └── services/
+│       ├── api.js               # Client API service with Vercel environment detection
+│       └── browserEngine.js     # Continuous client simulation engine for Vercel
+└── server.cjs                   # Optional standalone production server entry
+```
 
 ---
 
-## 10. 3-Minute Demonstration Script
+## 10. API Reference
 
-- **[0:00 - 0:40] Introduction & Core Problem**: Open the dashboard at `http://localhost:5173`. Point out the header showing the active strategy, contention score gauge, and database status badge. Explain the research question: OCC collapses under write contention, while PCC incurs lock overhead when contention is low.
-- **[0:40 - 1:20] Running Low Contention Workload (OCC Mode)**: Select the "Low Contention" profile. Click "Start Sim". Show the throughput climbing above 1000 tps with 0% conflict rate. Show that OCC delivers maximum throughput with minimum latency.
-- **[1:20 - 2:00] Burst Contention & Adaptive Response**: Switch strategy to "Adaptive Guard" and select the "Burst Contention" profile. Click "Start Sim". Watch the live charts as the burst phase triggers: the contention score rises past the 40% threshold, the strategy pill transitions from OCC $\rightarrow$ PCC, and the Strategy Transition Events feed logs the exact reason. Notice that transaction aborts remain zero because row locks serialize the hot item.
-- **[2:00 - 2:30] Automated 3-Way Benchmark**: Click "Run Comparison". Explain that the engine resets the database to identical baselines and runs identical workloads across OCC, PCC, and Adaptive. Point to the generated Research Comparison bar charts and the Invariant Verification Audit Matrix proving 0 violations.
-- **[2:30 - 3:00] Data Export & Invariant Proof**: Click "Export Benchmark CSV" to download the raw trial metrics for academic reporting. Highlight that all three protocols preserved 100% data consistency with zero negative stock.
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/health` | `GET` | System health check and storage engine status |
+| `/api/products` | `GET`, `POST` | List catalog items or create a new inventory item |
+| `/api/transactions/purchase` | `POST` | Execute atomic purchase with specified strategy (`OCC`, `PCC`, `ADAPTIVE`) |
+| `/api/transactions` | `GET` | Retrieve transaction audit history with filtering |
+| `/api/simulation/start` | `POST` | Start asynchronous concurrent transaction simulation |
+| `/api/simulation/stop` | `POST` | Stop active workload simulation |
+| `/api/simulation/reset` | `POST` | Reset catalog stock, transactions, and metrics |
+| `/api/simulation/compare` | `POST` | Execute automated 3-way benchmark across all protocols |
+| `/api/simulation/status` | `GET` | Fetch active simulation progress and dispatch statistics |
+| `/api/simulation/export-csv` | `GET` | Download transaction audit log as CSV |
+| `/api/metrics` | `GET` | Aggregated throughput, latencies, and time-series data |
+| `/api/strategy/adaptive` | `GET` | Real-time adaptive controller score and threshold status |
+| `/api/strategy/config` | `POST` | Update adaptive thresholds and cooldown parameters |
+| `/api/consistency/report` | `GET` | Execute 5-point mathematical consistency audit |
+
+---
+
+## 11. Demonstration Walkthrough (3 Minutes)
+
+1. **Dashboard Overview (0:00 - 0:40)**:
+   * Open `http://localhost:5173`.
+   * Point out the live telemetry banner, database status (In-Memory Engine), and the active strategy pill.
+2. **Low Contention (OCC Mode) (0:40 - 1:15)**:
+   * Select **Low Contention** profile, strategy **OCC**.
+   * Click **Start Simulation**. Observe throughput surging above 1000 TPS with 0% conflict rate.
+3. **Burst Wave & Adaptive Shift (1:15 - 2:00)**:
+   * Select **Adaptive Guard** and **Burst Wave** profile.
+   * Click **Start Simulation**.
+   * Watch the contention score surge as flash traffic hits. At >40% contention, the strategy automatically escalates from **OCC $\rightarrow$ PCC** to serialize the hot product with 0 aborts.
+   * Once contention drops below 15%, the system reverts back to OCC.
+4. **Automated 3-Way Benchmark (2:00 - 2:40)**:
+   * Click **Run Comparison**.
+   * The benchmark resets stock to identical baselines and tests OCC, PCC, and Adaptive under identical conditions.
+   * Review the Comparative Results bar charts and the verified Invariant Audit.
+5. **Data Export & Audit (2:40 - 3:00)**:
+   * Click **Export Benchmark CSV** to download raw trial metrics.
+
+---
+
+## 12. License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
