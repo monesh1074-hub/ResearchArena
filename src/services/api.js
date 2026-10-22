@@ -11,7 +11,16 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
-let useBrowserEngine = false;
+// Detect Vercel / serverless environment
+const isVercel = typeof window !== 'undefined' && (
+  window.location.hostname.includes('vercel.app') ||
+  window.location.hostname.includes('now.sh')
+);
+
+// On Vercel, multi-instance serverless lambdas don't share RAM and freeze background loops.
+// Using browserEngine guarantees 100% continuous, monotonic metrics that never drop to 0!
+let useBrowserEngine = isVercel;
+
 
 async function fetchJson(endpoint, options = {}) {
   if (useBrowserEngine) {

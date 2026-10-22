@@ -38,6 +38,7 @@ class BrowserSimulationEngine {
     this.activeStrategy = 'OCC';
     this.contentionScore = 0;
     this.switchCount = 0;
+    this.timeSeries = [];
     this.metrics = {
       totalTransactions: 0,
       successfulTransactions: 0,
@@ -45,9 +46,11 @@ class BrowserSimulationEngine {
       conflictRatePercent: 0,
       throughputTps: 0,
       avgLatencyMs: 0,
-      p95LatencyMs: 0
+      p95LatencyMs: 0,
+      timeSeries: []
     };
   }
+
 
   getHealth() {
     return {
@@ -278,6 +281,25 @@ class BrowserSimulationEngine {
       const conflicts = this.transactions.filter(t => t.conflict_detected).length;
       const elapsedSec = Math.max(0.1, (Date.now() - startTime) / 1000);
 
+      const allLatencies = this.transactions.map(t => t.execution_time_ms).sort((a, b) => a - b);
+      const p95 = allLatencies.length > 0 ? allLatencies[Math.floor(allLatencies.length * 0.95)] : 25;
+      
+      const now = new Date();
+      const timeLabel = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+      
+      if (!this.timeSeries) this.timeSeries = [];
+      if (i % 3 === 0 || i === total - 1) {
+        this.timeSeries.push({
+          timeLabel,
+          tps: Number((this.transactions.length / elapsedSec).toFixed(1)),
+          avgLatency: Number((this.transactions.reduce((acc, t) => acc + t.execution_time_ms, 0) / this.transactions.length).toFixed(1)),
+          p95Latency: p95,
+          conflictRate: Number(((conflicts / this.transactions.length) * 100).toFixed(1)),
+          contentionScore: this.contentionScore
+        });
+        if (this.timeSeries.length > 30) this.timeSeries.shift();
+      }
+
       this.metrics = {
         totalTransactions: this.transactions.length,
         successfulTransactions: successful,
@@ -285,13 +307,15 @@ class BrowserSimulationEngine {
         conflictRatePercent: Number(((conflicts / this.transactions.length) * 100).toFixed(1)),
         throughputTps: Number((this.transactions.length / elapsedSec).toFixed(1)),
         avgLatencyMs: Number((this.transactions.reduce((acc, t) => acc + t.execution_time_ms, 0) / this.transactions.length).toFixed(1)),
-        p95LatencyMs: 38
+        p95LatencyMs: p95,
+        timeSeries: [...this.timeSeries]
       };
 
       // Gentle pause to allow UI animations
-      if (i % 5 === 0) {
-        await new Promise(r => setTimeout(r, Math.max(2, this.config.transactionDelayMs)));
+      if (i % 4 === 0) {
+        await new Promise(r => setTimeout(r, Math.max(3, this.config.transactionDelayMs)));
       }
+
     }
 
     this.isRunning = false;

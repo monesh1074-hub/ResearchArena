@@ -37,6 +37,7 @@ export default function App() {
 
   const isSimRunning = simStatus?.isRunning || false;
   const prevSimRunningRef = useRef(false);
+  const isResettingRef = useRef(false);
 
   // Toggle Theme
   const handleToggleTheme = () => {
@@ -53,14 +54,35 @@ export default function App() {
     });
   };
 
-  // Fetch telemetry
+  // Fetch telemetry with Anti-Fluctuation Guard
   const fetchTelemetry = async () => {
     try {
       const res = await api.getMetrics();
       if (res && res.data) {
-        setMetrics(res.data.metrics || {});
-        setAdaptiveStatus(res.data.adaptive || {});
-        setDbStatus(res.data.database || {});
+        const incomingMetrics = res.data.metrics || {};
+        
+        // Prevent cold-start zero resets from overwriting active simulation data
+        setMetrics(prev => {
+          const prevTotal = prev?.totalTransactions || 0;
+          const incTotal = incomingMetrics?.totalTransactions || 0;
+          if (!isResettingRef.current && prevTotal > 0 && incTotal === 0) {
+            return prev;
+          }
+          return incomingMetrics;
+        });
+
+        if (res.data.adaptive) {
+          setAdaptiveStatus(prev => {
+            if (!isResettingRef.current && (prev?.switchCount || 0) > 0 && (res.data.adaptive.switchCount || 0) === 0) {
+              return prev;
+            }
+            return res.data.adaptive;
+          });
+        }
+
+        if (res.data.database) {
+          setDbStatus(res.data.database);
+        }
         if (res.data.comparison) {
           setComparisonData(res.data.comparison);
         }
@@ -70,17 +92,24 @@ export default function App() {
     }
   };
 
-  // Fetch simulation status
+  // Fetch simulation status with Anti-Fluctuation Guard
   const fetchSimStatus = async () => {
     try {
       const res = await api.getSimulationStatus();
       if (res && res.data) {
-        setSimStatus(res.data);
+        setSimStatus(prev => {
+          const prevCompleted = prev?.progress?.transactionsCompleted || 0;
+          const incCompleted = res.data?.progress?.transactionsCompleted || 0;
+          if (!isResettingRef.current && prevCompleted > 0 && incCompleted === 0) {
+            return prev;
+          }
+          return res.data;
+        });
       }
     } catch (_) { }
   };
 
-  // Fetch transactions
+  // Fetch transactions with Anti-Fluctuation Guard
   const fetchTransactions = async () => {
     try {
       const res = await api.getTransactions({
@@ -89,11 +118,17 @@ export default function App() {
         status: txFilters.status,
         productId: txFilters.productId
       });
-      if (res && res.data) {
-        setTransactions(res.data);
+      if (res && res.data && Array.isArray(res.data)) {
+        setTransactions(prev => {
+          if (!isResettingRef.current && prev.length > 0 && res.data.length === 0) {
+            return prev;
+          }
+          return res.data;
+        });
       }
     } catch (_) { }
   };
+
 
   // Fetch strategy events
   const fetchStrategyEvents = async () => {
@@ -175,8 +210,13 @@ export default function App() {
   };
 
   const handleResetSimulation = async (initialStock = 100) => {
+    isResettingRef.current = true;
     try {
       await api.resetSimulation({ initialInventory: initialStock });
+      setMetrics({});
+      setSimStatus({});
+      setTransactions([]);
+      setStrategyEvents([]);
       await fetchTelemetry();
       await fetchSimStatus();
       await fetchTransactions();
@@ -184,8 +224,13 @@ export default function App() {
       await fetchConsistency();
     } catch (err) {
       alert(`Failed to reset: ${err.message}`);
+    } finally {
+      setTimeout(() => {
+        isResettingRef.current = false;
+      }, 600);
     }
   };
+
 
   const handleRunComparison = async (config) => {
     setIsComparing(true);
