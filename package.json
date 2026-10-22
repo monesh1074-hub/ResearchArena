@@ -4,9 +4,17 @@
   "private": true,
   "description": "Research Arena - Contention-Aware Transaction Guard (CTG)",
   "scripts": {
+    "dev": "npm --prefix contention-guard run dev",
+    "start": "npm --prefix contention-guard start",
     "build": "npm --prefix contention-guard/client run build",
     "client": "npm --prefix contention-guard/client run dev",
-    "server": "npm --prefix contention-guard/server start",
-    "dev": "npm --prefix contention-guard run dev"
+    "server": "npm --prefix contention-guard/server run dev",
+    "deploy": "npx -y vercel --prod"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
   }
 }
