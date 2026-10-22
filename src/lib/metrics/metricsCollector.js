@@ -170,6 +170,11 @@ class MetricsCollector {
     };
   }
 
+  getAggregatedMetrics() {
+    return this.getMetricsSummary();
+  }
+
+
   saveComparisonResults(results) {
     this.comparisonResults = {
       ...results,

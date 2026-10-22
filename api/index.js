@@ -147,11 +147,12 @@ router.get('/metrics', (req, res) => {
   res.json({
     success: true,
     data: {
-      metrics: metricsCollector.getAggregatedMetrics(),
-      adaptive: adaptiveController.getStatus(),
-      database: db.getDbStatus(),
+      metrics: metricsCollector.getMetricsSummary ? metricsCollector.getMetricsSummary() : (metricsCollector.getAggregatedMetrics ? metricsCollector.getAggregatedMetrics() : {}),
+      adaptive: adaptiveController.getStatus ? adaptiveController.getStatus() : {},
+      database: db.getDbStatus ? db.getDbStatus() : {},
       comparison: workloadSimulator.comparisonResults || null
     }
+
   });
 });
 
