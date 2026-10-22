@@ -1,13 +1,16 @@
 import { browserEngine } from './browserEngine';
 
 const getApiBase = () => {
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (!envUrl) return '/api';
-  const cleanUrl = envUrl.replace(/\/$/, '');
-  return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL;
+    const cleanUrl = envUrl.replace(/\/$/, '');
+    return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  }
+  return '/api';
 };
 
 const API_BASE = getApiBase();
+
 let useBrowserEngine = false;
 
 async function fetchJson(endpoint, options = {}) {

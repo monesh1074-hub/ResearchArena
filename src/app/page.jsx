@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
-import Header from './components/Header';
-import ChallengeOverview from './components/ChallengeOverview';
-import OverviewCards from './components/OverviewCards';
-import WorkloadControls from './components/WorkloadControls';
-import LiveCharts from './components/LiveCharts';
-import ComparisonSection from './components/ComparisonSection';
-import TransactionLogs from './components/TransactionLogs';
-import StrategyEventsFeed from './components/StrategyEventsFeed';
-import AdaptiveConfigModal from './components/AdaptiveConfigModal';
-import SubmitAbstractModal from './components/SubmitAbstractModal';
-import { api } from './services/api';
+'use client';
 
-export default function App() {
+import React, { useState, useEffect, useRef } from 'react';
+import Header from '../components/Header';
+import ChallengeOverview from '../components/ChallengeOverview';
+import OverviewCards from '../components/OverviewCards';
+import WorkloadControls from '../components/WorkloadControls';
+import LiveCharts from '../components/LiveCharts';
+import ComparisonSection from '../components/ComparisonSection';
+import TransactionLogs from '../components/TransactionLogs';
+import StrategyEventsFeed from '../components/StrategyEventsFeed';
+import AdaptiveConfigModal from '../components/AdaptiveConfigModal';
+import SubmitAbstractModal from '../components/SubmitAbstractModal';
+import { api } from '../services/api';
+
+export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('arena'); // 'arena' | 'challenge' | 'ledger'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -42,10 +44,12 @@ export default function App() {
   const handleToggleTheme = () => {
     setIsDarkMode(prev => {
       const next = !prev;
-      if (next) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
+      if (typeof document !== 'undefined') {
+        if (next) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
       }
       return next;
     });
@@ -55,7 +59,7 @@ export default function App() {
   const fetchTelemetry = async () => {
     try {
       const res = await api.getMetrics();
-      if (res.data) {
+      if (res && res.data) {
         setMetrics(res.data.metrics || {});
         setAdaptiveStatus(res.data.adaptive || {});
         setDbStatus(res.data.database || {});
@@ -72,7 +76,7 @@ export default function App() {
   const fetchSimStatus = async () => {
     try {
       const res = await api.getSimulationStatus();
-      if (res.data) {
+      if (res && res.data) {
         setSimStatus(res.data);
       }
     } catch (_) { }
@@ -87,7 +91,7 @@ export default function App() {
         status: txFilters.status,
         productId: txFilters.productId
       });
-      if (res.data) {
+      if (res && res.data) {
         setTransactions(res.data);
       }
     } catch (_) { }
@@ -97,7 +101,7 @@ export default function App() {
   const fetchStrategyEvents = async () => {
     try {
       const res = await api.getStrategyEvents({ limit: 40 });
-      if (res.data) {
+      if (res && res.data) {
         setStrategyEvents(res.data);
       }
     } catch (_) { }
@@ -107,7 +111,7 @@ export default function App() {
   const fetchConsistency = async () => {
     try {
       const res = await api.getConsistencyReport();
-      if (res.data) {
+      if (res && res.data) {
         setConsistencyData(res.data);
       }
     } catch (_) { }
@@ -189,7 +193,7 @@ export default function App() {
     setIsComparing(true);
     try {
       const res = await api.runComparison(config);
-      if (res.data) {
+      if (res && res.data) {
         setComparisonData(res.data);
       }
       await fetchTelemetry();

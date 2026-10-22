@@ -36,7 +36,7 @@ async function initDb() {
         console.log('[DB] Successfully connected to PostgreSQL.');
 
         // Run migrations
-        const migrationPath = path.join(__dirname, '../../migrations/init.sql');
+        const migrationPath = path.join(__dirname, '../migrations/init.sql');
         if (fs.existsSync(migrationPath)) {
           const sql = fs.readFileSync(migrationPath, 'utf8');
           await client.query(sql);

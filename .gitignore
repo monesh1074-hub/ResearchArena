@@ -8,12 +8,14 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Production & Build outputs
+.next/
 dist/
 */dist/
 build/
 */build/
 .vercel
 .output
+
 
 # Environment & Sensitive configs (Do not commit secrets)
 .env
